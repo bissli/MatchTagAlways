@@ -15,8 +15,39 @@
 " You should have received a copy of the GNU General Public License
 " along with MatchTagAlways.  If not, see <http://www.gnu.org/licenses/>.
 
+function! LongEnough( timer, delay, ... )
+  let result = 0
+  let suppressionCount = 0
+  if ( exists( 'a:1' ) )
+    let suppressionCount = a:1
+  endif
+  " This is the first time we're being called.
+  if ( !exists( a:timer ) )
+    let result = 1
+  else
+    let timeElapsed = localtime() - {a:timer}
+    " If it's been a while...
+    if ( timeElapsed >= a:delay )
+      let result = 1
+    elseif ( suppressionCount > 0 )
+      let {a:timer}_callCount += 1
+      " It hasn't been a while, but the number of times we have been called has hit the suppression limit, so we activate
+      " anyway.
+      if ( {a:timer}_callCount >= suppressionCount )
+        let result = 1
+      endif
+    endif
+  endif
+  " Reset both the timer and the number of times we've been called since the last update.
+  if ( result )
+    let {a:timer} = localtime()
+    let {a:timer}_callCount = 0
+  endif
+  return result
+endfunction
 
 let s:script_folder_path = escape( expand( '<sfile>:p:h' ), '\' )
+
 if has('python')
     " Python 2
     py import sys
@@ -51,8 +82,8 @@ function! MatchTagAlways#Setup()
   endif
 
   augroup matchtagalways
-    autocmd! CursorMoved,CursorMovedI,WinEnter <buffer>
-          \ call s:HighlightEnclosingTagsIfPossible()
+     autocmd! CursorMoved,CursorMovedI,WinEnter <buffer> call s:RunHighLightEnclosingTag()
+     autocmd! CursorHold,CursorHoldI <buffer> call s:HighlightEnclosingTagsIfPossible()
   augroup END
 
   if !g:mta_use_matchparen_group && g:mta_set_default_matchtag_color
@@ -60,6 +91,12 @@ function! MatchTagAlways#Setup()
   endif
 endfunction
 
+function! s:RunHighLightEnclosingTag()
+  " debounce
+  if LongEnough("s:countDebaunce", 1, 4)
+    call s:HighlightEnclosingTagsIfPossible()
+  endif
+endfunction
 
 function! s:HighlightEnclosingTagsIfPossible()
   " Remove any previous highlighting.
