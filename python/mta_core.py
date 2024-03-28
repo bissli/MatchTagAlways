@@ -81,7 +81,7 @@ def PacifyHtmlComments( text ):
   with the mapping of string offset to Vim line/column."""
 
   def replacement( match ):
-    return re.sub( '\S', 'x', match.group() )
+    return re.sub( r'\S', 'x', match.group() )
   return COMMENT_REGEX.sub( replacement, text )
 
 
